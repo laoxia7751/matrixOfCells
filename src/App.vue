@@ -1,7 +1,7 @@
 <template>
   <div class="wrapper">
     <div class="canvasBox">
-      <Grid :mockData="mockData"/>
+      <Grid :defectData="mockData"/>
     </div>
   </div>
 </template>
