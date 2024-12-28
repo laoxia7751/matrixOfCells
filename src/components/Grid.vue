@@ -3,7 +3,7 @@
       <div ref="chipImageRef" class="chipImage">
         <canvas ref="canvasRef" id="chipCanvas"></canvas>
       </div>
-      <div class="zoom-control">
+      <div class="zoom-control" v-if="zoomControl">
         <input 
           type="range" 
           v-model="zoomLevel" 
@@ -18,17 +18,23 @@
   </template>
   
   <script setup>
-  import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
+  import { ref, onMounted, onUnmounted, nextTick, watch, computed, defineExpose } from 'vue';
   
   const chipImageRef = ref(null);
   const canvasRef = ref(null);
   
   const props = defineProps({
-      defectData: {
+    defectData: {
       type: Object,
       required: true
     },
+    zoomControl: {
+      type: Boolean,
+      default: false
+    }
   });
+  
+  const emit = defineEmits(['click-die'])
   
   const codeColorMap = new Map([
       ['___','#000000'],
@@ -60,6 +66,9 @@
   
   // 添加 ResizeObserver 相关变量
   let resizeObserver = null;
+  
+  // 添加高亮单元格的状态
+  let highlightCell = null;
   
   const getDefectColor = (row, col) => {
     // 计算相对于中心点的坐标
@@ -142,6 +151,22 @@
     return { startRow, endRow, startCol, endCol };
   };
   
+  // 添加高亮单元格的方法
+  const highlightCenterCell = (coordinates) => {
+    if (coordinates) {
+      // 保存新的高亮坐标
+      highlightCell = {
+        x: coordinates[0],
+        y: coordinates[1]
+      };
+    } else {
+      // 清除高亮
+      highlightCell = null;
+    }
+    // 重新绘制
+    drawMatrix();
+  };
+  
   // 绘制矩阵
   const drawMatrix = () => {
     if (isDrawingRequested) return;
@@ -173,11 +198,28 @@
           const x = (col - cols/2) * cellSize;
           const y = (row - rows/2) * cellSize;
           
-          // 检查是否存在缺陷
-          const defectColor = getDefectColor(row, col);
+          // 计算当前单元格的坐标系坐标
+          let coordX = -(Math.ceil(col - cols/2));
+          let coordY = -(Math.ceil(row - rows/2));
           
-          // 如果存在缺陷，使用缺陷颜色，否则使用默认颜色映射
-          ctx.fillStyle = defectColor || codeColorMap.get(cellValue) || '#000000';
+          if (coordY <= 0) coordY -= 1;
+          if (coordX <= 0) coordX -= 1;
+          
+          // 检查是否是高亮单元格
+          const isHighlighted = highlightCell && 
+            highlightCell.x === -coordX && 
+            highlightCell.y === coordY;
+          
+          if (isHighlighted) {
+            // 绘制白色高亮
+            ctx.fillStyle = '#FFFFFF';
+          } else {
+            // 检查是否存在缺陷
+            const defectColor = getDefectColor(row, col);
+            // 使用正常颜色
+            ctx.fillStyle = defectColor || codeColorMap.get(cellValue) || '#000000';
+          }
+          
           ctx.fillRect(x, y, cellSize, cellSize);
           ctx.strokeStyle = '#333';
           ctx.strokeRect(x, y, cellSize, cellSize);
@@ -326,6 +368,7 @@
       const defect = defectCodes.value.find(d => d.DieCol === coordX && d.DieRow === coordY);
       if (defect && defect.DefectCodes.length > 0) {
         console.log('缺陷信息:', defect.DefectCodes[0]);
+        emit('click-die', defect);
       }
     }
   };
@@ -374,6 +417,11 @@
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
     }
+  });
+  
+  // 暴露方法
+  defineExpose({
+    highlightCenterCell
   });
   </script>
   
